@@ -9,7 +9,9 @@ disable-model-invocation: true
 
 ## Overview
 
-一个编排层 skill。它把三个外部仓库的 5 个 skill 串成一条工作流：访谈收敛后先问用户任务复杂不复杂，复杂就多走一段里程碑规划与对抗性评审，然后产出实现计划并移交执行。本 skill 不定义任何访谈、里程碑或计划规则——那些规则只存在于被依赖的 skill 里。
+一个编排层 skill。它把工作流固定为四个必需的外部 skill（`grilling`、`domain-modeling`、`milestone-planning`、`writing-plans`，来自三个不同仓库），加若干可选项：访谈阶段可用 `grill-with-docs` 一次顶两次，执行阶段可移交 `superpowers` 的执行与收尾 skill。本 skill 不定义任何访谈、里程碑或计划规则——那些规则只存在于被依赖的 skill 里。
+
+流程形状：访谈收敛后先问用户任务复杂不复杂，复杂才走里程碑规划与对抗性评审，然后产出实现计划并移交执行。
 
 **本 skill 不含任何依赖 skill 的内容副本。** 依赖的实际文本由用户从原始仓库获取，因此上游更新会直接生效。
 
@@ -17,34 +19,35 @@ disable-model-invocation: true
 
 按命名空间引用，本仓库不含这些 skill 的文件：
 
-| 命名空间 | 作用 | 所属插件 / marketplace | 原始仓库 |
-| --- | --- | --- | --- |
-| `mattpocock-skills:grill-with-docs` | 聚合入口：一次调用同时跑访谈与文档产出 | `mattpocock-skills@mattpocock` (^1.3.1) | [mattpocock/skills](https://github.com/mattpocock/skills) |
-| `mattpocock-skills:grilling` | 决策树式多轮访谈，产出共识理解 | 同上 | 同上 |
-| `mattpocock-skills:domain-modeling` | 实时维护领域词汇与决策记录 | 同上 | 同上 |
-| `engineering-discipline:milestone-planning` | 并行探索代码 → 起草里程碑 DAG → 对抗性评审循环 | `engineering-discipline@engineering-discipline` (^1.7.0) | [tmdgusya/engineering-discipline](https://github.com/tmdgusya/engineering-discipline) |
-| `superpowers:writing-plans` | 面向零上下文工程师的详细实现计划 | `superpowers@superpowers-dev` (^7.0.0) | [obra/superpowers](https://github.com/obra/superpowers) |
-
-Phase 5 用到的 `subagent-driven-development`、`executing-plans`、`finishing-a-development-branch` 来自同一个 `superpowers` 插件，不额外增加依赖。
+| 命名空间 | 必需？ | 作用 | 所属插件 / marketplace | 原始仓库 |
+| --- | --- | --- | --- | --- |
+| `mattpocock-skills:grilling` | **必需** | 决策树式多轮访谈，产出共识理解 | `mattpocock-skills@mattpocock` (^1.3.1) | [mattpocock/skills](https://github.com/mattpocock/skills) |
+| `mattpocock-skills:domain-modeling` | **必需** | 实时维护领域词汇与决策记录 | 同上 | 同上 |
+| `engineering-discipline:milestone-planning` | **必需**（复杂路径） | 并行探索代码 → 起草里程碑 DAG → 对抗性评审循环 | `engineering-discipline@engineering-discipline` (^1.7.0) | [tmdgusya/engineering-discipline](https://github.com/tmdgusya/engineering-discipline) |
+| `superpowers:writing-plans` | **必需** | 面向零上下文工程师的详细实现计划 | `superpowers@superpowers-dev` (^7.0.0) | [obra/superpowers](https://github.com/obra/superpowers) |
+| `mattpocock-skills:grill-with-docs` | 可选 | 聚合入口，一次调用同时跑访谈与文档；缺省时由本 skill 依次调上面两个 | 同 `grilling` | 同上 |
+| `superpowers:subagent-driven-development`、`superpowers:executing-plans`、`superpowers:finishing-a-development-branch` | 可选（仅 Phase 5 移交目标） | 执行与收尾 | 同 `writing-plans`，不额外增加依赖 | 同上 |
 
 依赖解析因分发方式而异：
 
-- **Claude Code Plugin**：`plugin.json` 已声明这三条依赖，安装本插件时由 Claude Code 自动从各自 marketplace 拉取，用户无需手动装。前提是那三个 marketplace 已在用户机器上配置（见 README 第二节）。
-- **CC Switch**：**不会解析依赖**。用户必须自己在 CC Switch 里添加并安装上面三个仓库，否则本 skill 运行到第一个依赖就断。
+- **Claude Code Plugin**：`plugin.json` 已声明这三条依赖，安装本插件时由 Claude Code 自动从各自 marketplace 拉取，用户无需手动装。前提是那三个 marketplace 已在用户机器上配置（见 README 第二节）。注意依赖是按**插件**整体安装的，不止这 4 个 skill，常驻上下文成本约 2.9k token，明细见 README。
+- **CC Switch**：**不会解析依赖**。用户必须自己在 CC Switch 里添加并安装上面三个仓库，再按需勾选具体 skill，否则本 skill 运行到第一个依赖就断。
 
 ### Step 0: 自检
 
-开始前确认上述五个命名空间可用。任一缺失就停下来，按用户所用的分发方式给出补齐指引，不要凭记忆模拟缺失 skill 的行为。
+开始前确认四个**必需**命名空间可用：`grilling`、`domain-modeling`、`writing-plans`，以及（走复杂路径时）`milestone-planning`。任一必需项缺失就停下来，按用户所用的分发方式给出补齐指引，不要凭记忆模拟缺失 skill 的行为。
+
+可选项缺失不阻塞：`grill-with-docs` 缺失走下面的等价退路，Phase 5 的执行类 skill 缺失则把计划交给用户自行执行。
 
 ## Workflow
 
 ### Phase 1: 澄清与领域建模
 
-调用 `mattpocock-skills:grill-with-docs`（它的做法就是把 `grilling` 与 `domain-modeling` 各调一次）。
+跑 `mattpocock-skills:grilling` 对用户做多轮结构化提问，同时用 `mattpocock-skills:domain-modeling` 把确认下来的术语与决策实时写进词汇表和决策记录。
 
-只有在用户明确只要访谈、不要写文档时，才单独调 `mattpocock-skills:grilling`。
+若 `grill-with-docs` 可用，优先调它一次即可——它就是上述两个 skill 的聚合入口。注意它自己标了 `disable-model-invocation: true`，部分宿主环境会拒绝由 agent 触发，此时退回上面两个。
 
-若 `grill-with-docs` 无法由 agent 调起（它自己标了 `disable-model-invocation: true`，部分宿主环境会拒绝模型自动触发），直接改调 `mattpocock-skills:grilling` 加 `mattpocock-skills:domain-modeling`——这就是它的全部行为，效果等价。
+只有在用户明确只要访谈、不要写文档时，才只调 `grilling`。
 
 **完成判据：** 依赖 skill 自己判定访谈收敛（设计树没有遗留的隐性假设），且用户确认达成共识。产出：词汇表与决策记录文件。
 
@@ -121,7 +124,8 @@ Phase 5 用到的 `subagent-driven-development`、`executing-plans`、`finishing
 ## Order Matters
 
 ```
-Phase 1: mattpocock-skills:grill-with-docs  (grilling + domain-modeling)
+Phase 1: mattpocock-skills:grilling + mattpocock-skills:domain-modeling
+         （装了 grill-with-docs 可用一次调用代替）
     ↓  需求收敛、用户确认
 Phase 2: 询问用户业务是否复杂（>8 步骤 或 >3 核心模块）
     ├─ 不复杂 ────────────────────────────┐

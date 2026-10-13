@@ -8,20 +8,22 @@ This repository contains chaining logic only. **It holds no copy of any dependen
 
 ## Dependencies
 
-| Namespace | Role | Plugin / marketplace | Source repo |
-| --- | --- | --- | --- |
-| `mattpocock-skills:grill-with-docs` | Entry point: runs the interview and writes the docs in one call | `mattpocock-skills@mattpocock` ^1.3.1 | [mattpocock/skills](https://github.com/mattpocock/skills) |
-| `mattpocock-skills:grilling` | Decision-tree interview across multiple rounds | same | same |
-| `mattpocock-skills:domain-modeling` | Maintains the glossary and decision records as you go | same | same |
-| `engineering-discipline:milestone-planning` | Parallel codebase exploration → milestone DAG → adversarial critic rounds | `engineering-discipline@engineering-discipline` ^1.7.0 | [tmdgusya/engineering-discipline](https://github.com/tmdgusya/engineering-discipline) |
-| `superpowers:writing-plans` | Detailed implementation plan written for an engineer with zero context | `superpowers@superpowers-dev` ^7.0.0 | [obra/superpowers](https://github.com/obra/superpowers) |
+| Namespace | Required | Role | Plugin / marketplace | Source repo |
+| --- | --- | --- | --- | --- |
+| `mattpocock-skills:grilling` | **yes** | Decision-tree interview across multiple rounds | `mattpocock-skills@mattpocock` ^1.3.1 | [mattpocock/skills](https://github.com/mattpocock/skills) |
+| `mattpocock-skills:domain-modeling` | **yes** | Maintains the glossary and decision records as you go | same | same |
+| `engineering-discipline:milestone-planning` | **yes** (complex path) | Parallel codebase exploration → milestone DAG → adversarial critic rounds | `engineering-discipline@engineering-discipline` ^1.7.0 | [tmdgusya/engineering-discipline](https://github.com/tmdgusya/engineering-discipline) |
+| `superpowers:writing-plans` | **yes** | Detailed implementation plan written for an engineer with zero context | `superpowers@superpowers-dev` ^7.0.0 | [obra/superpowers](https://github.com/obra/superpowers) |
+| `mattpocock-skills:grill-with-docs` | no | Shortcut that runs the two skills above in one call | same as `grilling` | same |
+| `superpowers:subagent-driven-development`, `superpowers:executing-plans`, `superpowers:finishing-a-development-branch` | no | Where Phase 5 hands off to | same as `writing-plans` | same |
 
-The three execution skills used in Phase 5 (`subagent-driven-development`, `executing-plans`, `finishing-a-development-branch`) ship in the same `superpowers` plugin, so they add no extra dependency.
+Four skills are required; the rest only make the workflow shorter to drive. Note that on the plugin path you install whole plugins, so you cannot cherry-pick this list — see [Granularity](#granularity-what-the-plugin-path-costs-you).
 
 ## Workflow
 
 ```
-Phase 1: mattpocock-skills:grill-with-docs   (grilling + domain-modeling)
+Phase 1: mattpocock-skills:grilling + mattpocock-skills:domain-modeling
+         (single call to grill-with-docs when that shortcut is installed)
     ↓  requirement settled, user confirms
 Phase 2: ask the user whether the business logic is complex
          (>8 implementation steps, or >3 core modules to touch/understand)
@@ -65,15 +67,20 @@ Then install `grill-plan-execute`.
 
 **2. Install the dependencies by hand (this step cannot be skipped)**
 
-CC Switch **does not read the `dependencies` field in `plugin.json`**. After installing this skill you must add and install all three upstream repositories yourself. Each one also uses Subdirectory `skills`:
+CC Switch **does not read the `dependencies` field in `plugin.json`**. You must add each upstream repository and install the skills it hosts. Add a repo with Subdirectory `skills`, then pick only the skills this workflow needs:
 
-- [mattpocock/skills](https://github.com/mattpocock/skills) — Subdirectory: `skills` (provides `grill-with-docs`, `grilling`, `domain-modeling`)
-- [tmdgusya/engineering-discipline](https://github.com/tmdgusya/engineering-discipline) — Subdirectory: `skills` (provides `milestone-planning`)
-- [obra/superpowers](https://github.com/obra/superpowers) — Subdirectory: `skills` (provides `writing-plans`)
+| Repository (Subdirectory: `skills`) | Required | Only needed for Phase 5 | Optional |
+| --- | --- | --- | --- |
+| [mattpocock/skills](https://github.com/mattpocock/skills) | `grilling` (`skills/productivity/grilling`), `domain-modeling` (`skills/engineering/domain-modeling`) | — | `grill-with-docs` (`skills/engineering/grill-with-docs`) |
+| [tmdgusya/engineering-discipline](https://github.com/tmdgusya/engineering-discipline) | `milestone-planning` (`skills/milestone-planning`) | — | `clarification`, `plan-crafting`, `long-run`, `run-plan`, `review-work` |
+| [obra/superpowers](https://github.com/obra/superpowers) | `writing-plans` (`skills/writing-plans`) | `subagent-driven-development`, `executing-plans`, `finishing-a-development-branch` | `requesting-code-review`, `receiving-code-review`, `test-driven-development`, `using-git-worktrees`, `verification-before-completion`, `dispatching-parallel-agents` |
 
-Use the workflow only once all three are installed. If one is missing, the workflow stops at the phase that needs it and tells you (that is what Step 0 in `SKILL.md` checks for).
+That is **4 skills minimum** (`grilling`, `domain-modeling`, `milestone-planning`, `writing-plans`), 7 if you also want the Phase 5 handoff. The "Optional" column is never required: `SKILL.md` falls back to calling `grilling` + `domain-modeling` itself when `grill-with-docs` is absent, and the other optional skills are only named as destinations when an upstream document points at one — if missing, the workflow tells you instead of improvising.
+
+Use the workflow only once the required skills are installed. If one is missing, the workflow stops at the phase that needs it and tells you (that is what Step 0 in `SKILL.md` checks for).
 
 > Note: after a CC Switch install these skills may not carry a plugin prefix. `SKILL.md` uses Claude Code Plugin's `plugin:skill` form; if your CC Switch exposes bare skill names, just drop the prefix — it is the same skill.
+
 
 ## Path 2: Claude Code Plugin
 
@@ -103,6 +110,22 @@ Claude Code then installs and enables all three dependencies listed in `plugin.j
 ```
 /grill-plan-execute:grill-plan-execute
 ```
+
+### Granularity: what the plugin path costs you
+
+Plugin dependencies are all-or-nothing: you get every skill the upstream plugin exposes, not just the four this workflow calls. Measured on Claude Code 2.1.278 with the pinned versions:
+
+| Plugin | Skills installed | Always-on cost |
+| --- | --- | --- |
+| `mattpocock-skills` | 27 | ~1,169 tok |
+| `engineering-discipline` | 11 | ~997 tok |
+| `superpowers` | 15 | ~706 tok |
+| **total** | **53** | **~2,872 tok in every session's system prompt** |
+
+That is on top of this plugin's own skill (~57 tok). We cannot trim it from our side: the skill list lives in each upstream `plugin.json` (Matt's explicitly enumerates 27 paths), and a marketplace entry has no supported way to subset somebody else's plugin.
+
+If you only want the four skills, use the CC Switch path above. To stay on the plugin path with a smaller footprint you would have to fork this repo, delete the `dependencies` array from `plugin.json`, and install the upstream skills by hand — which also gives up automatic dependency resolution and automatic upstream updates.
+
 
 ### Two behaviours worth knowing
 
