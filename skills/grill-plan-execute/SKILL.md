@@ -1,7 +1,7 @@
 ---
 name: grill-plan-execute
-description: 从模糊想法到可执行计划的端到端编排工作流。先深度访谈并沉淀领域文档，再询问用户业务复杂度：复杂则走含对抗性评审的里程碑规划、逐里程碑产出实现计划，不复杂则直接产出一份整体计划。本 skill 只做编排，不重复依赖 skill 的规则内容。
-when_to_use: 用户有一个尚未澄清的产品需求或多日技术任务，希望系统地走完"澄清 → 里程碑规划 → 实现计划"的完整链路；用户说"帮我从零规划这个功能"或"先想清楚再拆里程碑再排计划"。
+description: Orchestration-only workflow from a vague idea to executable plans — grill the user, model the domain, ask how complex the business is, then milestone-plan (complex) or plan directly, and hand off to execution. It chains external skills and copies none of their content. 从模糊想法到可执行计划的编排工作流：深度访谈并沉淀领域文档，再询问用户业务复杂度，复杂则走含对抗性评审的里程碑规划、逐里程碑产出实现计划，不复杂则直接产出一份整体计划。本 skill 只做编排，不重复依赖 skill 的规则内容。
+when_to_use: The user has an unclarified product requirement or multi-day technical task and wants the whole "clarify → milestone-plan → implementation plan" chain. 用户有一个尚未澄清的产品需求或多日技术任务，希望系统地走完"澄清 → 里程碑规划 → 实现计划"的完整链路；用户说"帮我从零规划这个功能"或"先想清楚再拆里程碑再排计划"。
 disable-model-invocation: true
 ---
 
@@ -14,6 +14,12 @@ disable-model-invocation: true
 流程形状：访谈收敛后先问用户任务复杂不复杂，复杂才走里程碑规划与对抗性评审，然后产出实现计划并移交执行。
 
 **本 skill 不含任何依赖 skill 的内容副本。** 依赖的实际文本由用户从原始仓库获取，因此上游更新会直接生效。
+
+## Output language（面向用户的语言）
+
+本文件的中文是写给 agent 的指令，不是给用户看的台词。**所有面向用户的输出——提问、选项标签、阶段报告、缺失依赖的补齐指引——一律跟随用户当前使用的语言**，用户用英文就整句英文，不要中英混排。
+
+下文凡给出带引号的提问原文处，都并列 EN / 中文 两版：按用户语言取其中一版发给用户，**不要把另一版一起显示**。
 
 ## Dependencies（前置条件，必须先装好）
 
@@ -53,14 +59,16 @@ disable-model-invocation: true
 
 ### Phase 2: 复杂度评估
 
-向用户提问：
+用宿主的结构化提问工具（如 `AskUserQuestion`）以**选项式**问用户，两个选项 `Complex / 复杂` 与 `Not complex / 不复杂`；宿主没有该工具时退化为纯文本 Y/N 提问。提问正文按 Output language 一节取用户语言的那一版，原文如下：
 
-> "根据当前理解，这个任务的业务逻辑是否复杂？判断标准：预计实现步骤超过 8 个，或需要修改/理解超过 3 个核心模块，就算复杂。复杂的话我会先做深入的代码探索和对抗性评审来查缺补漏，再拆里程碑；不复杂就直接出一份实现计划。"
+> **EN:** "Based on what we've settled so far — is the business logic here complex? Rule of thumb: complex means more than 8 implementation steps, or more than 3 core modules to modify or understand. If it's complex, I'll run a deep code exploration plus adversarial review to catch gaps before splitting milestones; if not, I'll go straight to one implementation plan."
+>
+> **中文：** "根据当前理解，这个任务的业务逻辑是否复杂？判断标准：预计实现步骤超过 8 个，或需要修改/理解超过 3 个核心模块，就算复杂。复杂的话我会先做深入的代码探索和对抗性评审来查缺补漏，再拆里程碑；不复杂就直接出一份实现计划。"
 
-- 用户回答 **不复杂** → 跳到 Phase 4
-- 用户回答 **复杂** → 进入 Phase 3
+- 用户选 **Not complex / 不复杂** → 跳到 Phase 4
+- 用户选 **Complex / 复杂** → 进入 Phase 3
 
-这个判断权在用户，不要替他决定。可以用 `engineering-discipline:clarification` 之类的提问方式辅助，但最终以用户答复为准。
+这个判断权在用户，不要替他决定，也不要因为"看起来简单"就跳过这一步。可以用 `engineering-discipline:clarification` 之类的提问方式辅助，但最终以用户答复为准。
 
 ### Phase 3: 里程碑规划（仅复杂路径）
 
@@ -109,7 +117,20 @@ disable-model-invocation: true
 
 两条路做完都进入 `superpowers:finishing-a-development-branch`，由它给 merge / PR / cleanup 选项。
 
+选项名（`Subagent-driven` / `Native`）保持 `writing-plans` 的上游原文，以便与它自己的提问对齐；两者**各自的代价与收益按用户语言解释**，不要只丢一个英文标签。
+
 **里程碑之间不要串用执行方式**：先完成当前里程碑的执行与收尾，再回到 Phase 4 要下一份计划。
+
+## Extending this workflow（往工作流里再插一个 skill）
+
+本 skill 是编排层，可以随时增加外源 skill，且**仍然遵守零副本约束：不要把新 skill 的正文抄进本仓库**，只登记引用方式并写清调用点。一次完整的扩展要同步这几处：
+
+1. **Dependencies 表**：新增一行，写命名空间（`plugin:skill` 形式）、必需？、作用、所属插件/marketplace 与版本范围、原始仓库链接。必需项还要进 **Step 0 自检**。
+2. **Workflow**：在对应 Phase 写调用点与**完成判据**，并说明它消费上游哪个产物、给下游留下什么（如 Phase 3 的代码事实那样前馈）。若它改变分支形状，更新 **Order Matters** 流程图。
+3. **`plugin.json`**：新插件不在现有 `dependencies` 里时，追加 `{name, marketplace, version}`；来自已声明插件（`mattpocock-skills` / `engineering-discipline` / `superpowers`）的 skill **无需改动**，插件路径本就整插件安装。
+4. **`marketplace.json`**：仅当引入**新 marketplace** 时，把它的名字加进 `allowCrossMarketplaceDependenciesOn`。
+5. **`README.md` 与 `README.zh.md`**：依赖表、CC Switch 逐仓库表（含仓库内路径与 Required 列）、Path 2 的 `marketplace add` 命令；若新增了插件，同步 Granularity 成本表（新增插件会带来常驻 token 成本）。
+6. **版本**：新增必需依赖会改变安装要求，按 minor 或 major 递增 `plugin.json` 的 `version`，并在 README 的 Versioning 一节沿用同一口径。
 
 ## Sibling skills
 

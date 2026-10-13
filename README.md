@@ -2,6 +2,8 @@
 
 [中文](./README.zh.md)
 
+Repository: **<https://github.com/zhy-ty/grill-plan-execute>**
+
 An **orchestration-only** Claude Code skill that chains skills from 3 external repositories into one workflow: clarify the requirement by grilling the user and modelling the domain, check with the user how complex the business really is, then produce implementation plans and hand off to execution.
 
 This repository contains chaining logic only. **It holds no copy of any dependency skill's content** — every dependency is fetched from its original repository, so upstream improvements reach users without this repo changing at all.
@@ -44,7 +46,7 @@ Phase 5: hand off to execution
     superpowers:finishing-a-development-branch (merge / PR / cleanup)
 ```
 
-The complexity judgement in Phase 2 belongs to the user — the skill always asks, never decides for them.
+The complexity judgement in Phase 2 belongs to the user — the skill always asks, never decides for them. The question goes through the host's option picker when one exists (`Complex` / `Not complex`), and every user-facing prompt follows the user's language: `SKILL.md` carries both EN and 中文 originals, so a non-Chinese speaker never gets shown Chinese text.
 
 ---
 
@@ -60,6 +62,7 @@ CC Switch looks for skills in a fixed directory layout, so the `skills/` level i
 
 | Field | Value |
 | --- | --- |
+| Repository URL | <https://github.com/zhy-ty/grill-plan-execute> |
 | Owner | `zhy-ty` |
 | Name | `grill-plan-execute` |
 | Branch | `main` |
@@ -69,7 +72,15 @@ Then install `grill-plan-execute`.
 
 **2. Install the dependencies by hand (this step cannot be skipped)**
 
-CC Switch **does not read the `dependencies` field in `plugin.json`**. You must add each upstream repository and install the skills it hosts. Add a repo with Subdirectory `skills`, then pick only the skills this workflow needs:
+CC Switch **does not read the `dependencies` field in `plugin.json`**. You must add each upstream repository and install the skills it hosts. Add these three, all with Subdirectory `skills`:
+
+| Repository URL | Owner | Name | Branch | Subdirectory |
+| --- | --- | --- | --- | --- |
+| <https://github.com/mattpocock/skills> | `mattpocock` | `skills` | `main` | `skills` |
+| <https://github.com/tmdgusya/engineering-discipline> | `tmdgusya` | `engineering-discipline` | `main` | `skills` |
+| <https://github.com/obra/superpowers> | `obra` | `superpowers` | `main` | `skills` |
+
+Then pick only the skills this workflow needs (paths are relative to each repository root):
 
 | Repository (Subdirectory: `skills`) | Required | Only needed for Phase 5 | Optional |
 | --- | --- | --- | --- |
@@ -142,6 +153,18 @@ Other things to check:
 
 - Version range unsatisfiable (e.g. upstream ships `superpowers` 8.0.0 while this repo declares `^7.0.0`) → widen or bump `version` in `plugin.json`
 - You installed `superpowers` from the official `claude-plugins-official` marketplace (its version usually trails upstream) → change that dependency's `"marketplace": "superpowers-dev"` to `"claude-plugins-official"` in `plugin.json`; both names are already in the allow list, so either passes the permission check. They can also coexist — `superpowers@superpowers-dev` and `superpowers@claude-plugins-official` side by side was tested and does not conflict.
+
+## Extending the workflow with another skill
+
+Yes — this is the intended way to grow the project. `SKILL.md` is a pure orchestration layer, so you can insert another external skill at any phase, and the zero-copy rule still holds: **never paste that skill's body text into this repo**, only register the reference and the call site. `skills/grill-plan-execute/SKILL.md` has an `Extending this workflow` section listing the exact touchpoints; in short:
+
+1. `SKILL.md` — a row in the dependency table (namespace, required?, role, plugin/marketplace + version range, source repo), the call site and its **completion criterion** in the right phase, and the flow diagram if the shape changes. Add it to Step 0 as well if it is required.
+2. `plugin.json` — only if the skill lives in a plugin that is not already a dependency. Skills from `mattpocock-skills`, `engineering-discipline` or `superpowers` need no change, because the plugin path installs those plugins whole.
+3. `marketplace.json` — only if you introduce a **new marketplace**: add its name to `allowCrossMarketplaceDependenciesOn`.
+4. `README.md` and `README.zh.md` — the dependency table, the CC Switch per-repository table above, the `marketplace add` commands, and the Granularity cost table if a new plugin is involved (each extra plugin adds always-on tokens for everyone).
+5. `plugin.json`'s `version` — a new *required* dependency changes what users must install, so bump at least a minor.
+
+The one thing to think about before adding a required skill: the plugin path cannot cherry-pick, so a required dependency from a fresh repository forces every user to install that whole plugin. Prefer optional call sites when the skill only helps in some situations.
 
 ## Versioning and updates
 

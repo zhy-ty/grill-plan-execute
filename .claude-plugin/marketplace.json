@@ -14,7 +14,7 @@
     {
       "name": "grill-plan-execute",
       "source": "./",
-      "description": "整合 grilling、domain-modeling、milestone-planning、writing-plans 的编排工作流"
+      "description": "Orchestration skill chaining grilling + domain-modeling into milestone-planning into writing-plans. 整合 grilling、domain-modeling、milestone-planning、writing-plans 的编排工作流"
     }
   ]
 }

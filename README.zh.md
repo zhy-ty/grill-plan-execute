@@ -2,6 +2,8 @@
 
 [English](./README.md)
 
+仓库地址：**<https://github.com/zhy-ty/grill-plan-execute>**
+
 一个**只做编排**的 Claude Code skill，把三个外部仓库的 skill 串成一条工作流：先靠逼问式访谈和领域建模把需求问清楚，再和用户确认业务到底有多复杂，然后产出实现计划并移交执行。
 
 本仓库只包含编排逻辑，**不含任何依赖 skill 的内容副本**——依赖正文全部来自各自原始仓库，所以上游的改进会直接触达用户，本仓库不需要跟着改。
@@ -44,7 +46,7 @@ Phase 5: 移交执行
     superpowers:finishing-a-development-branch（merge / PR / cleanup）
 ```
 
-Phase 2 的复杂度判断权在用户，skill 只会问，不会替他决定。
+Phase 2 的复杂度判断权在用户，skill 只会问，不会替他决定。提问在宿主支持结构化选项时走选项（`Complex` / `Not complex` 两选一），并且**所有面向用户的文字跟随用户当前语言**——`SKILL.md` 里的提问原文中英两版都给了，非中文用户不会看到中文。
 
 ---
 
@@ -60,6 +62,7 @@ CC Switch 按固定目录发现 skill，本仓库的 `skills/` 这一层就是�
 
 | 字段 | 值 |
 | --- | --- |
+| 仓库地址 | <https://github.com/zhy-ty/grill-plan-execute> |
 | Owner | `zhy-ty` |
 | Name | `grill-plan-execute` |
 | Branch | `main` |
@@ -69,7 +72,15 @@ CC Switch 按固定目录发现 skill，本仓库的 `skills/` 这一层就是�
 
 **2. 手动安装依赖（这一步不能省）**
 
-CC Switch **不解析 `plugin.json` 里的 `dependencies`**。你需要逐个添加上游仓库，再只勾选本工作流用得上的 skill。每个仓库的 Subdirectory 都是 `skills`：
+CC Switch **不解析 `plugin.json` 里的 `dependencies`**。你需要逐个添加下面的上游仓库，每个仓库的 Subdirectory 都填 `skills`：
+
+| 仓库地址 | Owner | Name | Branch | Subdirectory |
+| --- | --- | --- | --- | --- |
+| <https://github.com/mattpocock/skills> | `mattpocock` | `skills` | `main` | `skills` |
+| <https://github.com/tmdgusya/engineering-discipline> | `tmdgusya` | `engineering-discipline` | `main` | `skills` |
+| <https://github.com/obra/superpowers> | `obra` | `superpowers` | `main` | `skills` |
+
+添加完再只勾选本工作流用得上的 skill（路径相对各仓库根目录）：
 
 | 仓库（Subdirectory: `skills`） | 必需 | 只在 Phase 5 需要 | 可选 |
 | --- | --- | --- | --- |
@@ -140,6 +151,18 @@ Plugin 依赖是整包安装的：你会拿到该插件暴露的**全部** skill
 
 - 版本区间不满足（例如上游发了 `superpowers` 8.0.0，而这里声明的是 `^7.0.0`）→ 放宽或跟进 `plugin.json` 里的 `version`
 - 你的 `superpowers` 是从官方 `claude-plugins-official` 装的（版本通常落后于上游）→ 把那条依赖的 `"marketplace": "superpowers-dev"` 改成 `"claude-plugins-official"`；两个名字都已在 allow 清单里，改哪边都能通过权限检查。两者也能共存，实测 `superpowers@superpowers-dev` 与 `superpowers@claude-plugins-official` 同时存在不冲突。
+
+## 以后还能不能往工作流里再插一个 skill
+
+能，而且这就是本项目预期的成长方式。`SKILL.md` 是纯编排层，你可以在任意阶段插入新的外源 skill，同时**零副本约束依旧成立：不要把那个 skill 的正文抄进本仓库**，只登记引用方式和调用点。`skills/grill-plan-execute/SKILL.md` 里有 `Extending this workflow` 一节列明全部改动点，简述：
+
+1. `SKILL.md`：依赖表加一行（命名空间、必需？、作用、插件/marketplace 与版本区间、原始仓库链接），在对应 Phase 写调用点与**完成判据**，形状变了要更新流程图；若它是必需项，Step 0 自检也要加上。
+2. `plugin.json`：只有当新 skill 来自尚未声明的插件时才动。来自 `mattpocock-skills`、`engineering-discipline`、`superpowers` 的不用改——Plugin 路径本来就整插件安装。
+3. `marketplace.json`：只有引入**新 marketplace** 时，才把名字加进 `allowCrossMarketplaceDependenciesOn`。
+4. `README.md` 与 `README.zh.md`：依赖表、上面的 CC Switch 逐仓库表、`marketplace add` 命令；新增了插件的话同步粒度成本表（每个额外插件都给所有人增加常驻 token）。
+5. `plugin.json` 的 `version`：新增**必需**依赖会改变用户的安装要求，至少进 minor。
+
+唯一要提前想清楚的是：Plugin 路径没法挑，一个必需项若来自新仓库，就等于让所有人整包装下那个插件。只在部分场景有帮助的 skill，建议做成可选调用点。
 
 ## 版本与更新
 
