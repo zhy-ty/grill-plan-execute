@@ -1,76 +1,85 @@
 # grill-plan-execute
 
-一个**编排层** Claude Code Skill：把三个外部仓库的 5 个 skill 串成"澄清需求 → 里程碑规划 → 逐里程碑实现计划"的固定工作流。
+An **orchestration-only** Claude Code skill that chains 5 skills from 3 external repositories into one workflow: clarify the requirement by grilling the user and modelling the domain, check with the user how complex the business really is, then produce implementation plans and hand off to execution.
 
-本仓库只包含编排逻辑，**不含任何依赖 skill 的内容副本**。依赖正文全部由用户从原始仓库动态获取，所以上游更新会直接生效，本仓库不需要跟着改。
+This repository contains chaining logic only. **It holds no copy of any dependency skill's content** — every dependency is fetched from its original repository, so upstream improvements reach users without this repo changing at all.
 
-> **关于 `obra/superpowers-skills`**：该仓库已被作者归档（2025-10 起不再更新），本工作流依赖的 `writing-plans` 现取自在维护的 [obra/superpowers](https://github.com/obra/superpowers)（v7.x）。如果你依赖归档仓库的版本，需要自行 fork 维护。
+> **About `obra/superpowers-skills`**: that repository is archived (no updates since 2025-10). The `writing-plans` skill this workflow needs now lives in the actively maintained [obra/superpowers](https://github.com/obra/superpowers) (v7.x). If you need the archived version, fork it and maintain it yourself.
 
-## 依赖的外部 skill
+## Dependencies
 
-| 命名空间 | 作用 | 插件 / marketplace | 原始仓库 |
+| Namespace | Role | Plugin / marketplace | Source repo |
 | --- | --- | --- | --- |
-| `mattpocock-skills:grill-with-docs` | 聚合入口，一次调用同时跑访谈与文档产出 | `mattpocock-skills@mattpocock` ^1.3.1 | [mattpocock/skills](https://github.com/mattpocock/skills) |
-| `mattpocock-skills:grilling` | 决策树式多轮访谈 | 同上 | 同上 |
-| `mattpocock-skills:domain-modeling` | 实时维护领域词汇与决策记录 | 同上 | 同上 |
-| `engineering-discipline:milestone-planning` | 并行探索 → 里程碑 DAG → 对抗性评审循环 | `engineering-discipline@engineering-discipline` ^1.7.0 | [tmdgusya/engineering-discipline](https://github.com/tmdgusya/engineering-discipline) |
-| `superpowers:writing-plans` | 面向零上下文工程师的详细实现计划 | `superpowers@superpowers-dev` ^7.0.0 | [obra/superpowers](https://github.com/obra/superpowers) |
+| `mattpocock-skills:grill-with-docs` | Entry point: runs the interview and writes the docs in one call | `mattpocock-skills@mattpocock` ^1.3.1 | [mattpocock/skills](https://github.com/mattpocock/skills) |
+| `mattpocock-skills:grilling` | Decision-tree interview across multiple rounds | same | same |
+| `mattpocock-skills:domain-modeling` | Maintains the glossary and decision records as you go | same | same |
+| `engineering-discipline:milestone-planning` | Parallel codebase exploration → milestone DAG → adversarial critic rounds | `engineering-discipline@engineering-discipline` ^1.7.0 | [tmdgusya/engineering-discipline](https://github.com/tmdgusya/engineering-discipline) |
+| `superpowers:writing-plans` | Detailed implementation plan written for an engineer with zero context | `superpowers@superpowers-dev` ^7.0.0 | [obra/superpowers](https://github.com/obra/superpowers) |
 
-## 工作流
+The three execution skills used in Phase 5 (`subagent-driven-development`, `executing-plans`, `finishing-a-development-branch`) ship in the same `superpowers` plugin, so they add no extra dependency.
+
+## Workflow
 
 ```
-Phase 1: mattpocock-skills:grill-with-docs   （grilling + domain-modeling）
-    ↓  需求收敛，用户确认达成共识
-Phase 2: engineering-discipline:milestone-planning   （完整流程，含对抗性评审）
-    ↓  里程碑 DAG 锁定
-Phase 3: superpowers:writing-plans   ×  每个里程碑各一份
+Phase 1: mattpocock-skills:grill-with-docs   (grilling + domain-modeling)
+    ↓  requirement settled, user confirms
+Phase 2: ask the user whether the business logic is complex
+         (>8 implementation steps, or >3 core modules to touch/understand)
+    ├─ not complex ─────────────────────────────┐
+    └─ complex → Phase 3                        │
+Phase 3: engineering-discipline:milestone-planning
+         full flow: explore → draft → adversarial critique → revise until dry
+         ↓  milestone DAG locked                │
+Phase 4: superpowers:writing-plans  ←───────────┘
+         complex: one plan per milestone; not complex: one plan overall
     ↓
-Phase 4: 移交执行
+Phase 5: hand off to execution
     ├─ Subagent-driven → superpowers:subagent-driven-development
-    └─ Native          → superpowers:executing-plans  →  finishing-a-development-branch
+    └─ Native          → superpowers:executing-plans
+         ↓
+    superpowers:finishing-a-development-branch (merge / PR / cleanup)
 ```
 
-Phase 4 的三个 skill 同样来自 `superpowers`，不额外增加依赖。
-
+The complexity judgement in Phase 2 belongs to the user — the skill always asks, never decides for them.
 
 ---
 
-# 安装：两种方式选一种
+# Installation — pick one of two paths
 
-同一个仓库同时支持 CC Switch 和 Claude Code Plugin。CC Switch 走 `skills/` 目录发现，Claude Code 走 `.claude-plugin/` 清单。
+The same repository supports both CC Switch and Claude Code Plugin. CC Switch discovers skills through the `skills/` directory; Claude Code reads the manifests in `.claude-plugin/`.
 
-## 方式一：CC Switch
+## Path 1: CC Switch
 
-CC Switch 按固定目录发现 skill，本仓库的 `skills/` 一层就是给它用的。
+CC Switch looks for skills in a fixed directory layout, so the `skills/` level in this repo exists for you.
 
-**1. 添加本仓库**
+**1. Add this repository**
 
-| 字段 | 值 |
+| Field | Value |
 | --- | --- |
 | Owner | `zhy-ty` |
 | Name | `grill-plan-execute` |
 | Branch | `main` |
 | Subdirectory | `skills` |
 
-然后安装 `grill-plan-execute`。
+Then install `grill-plan-execute`.
 
-**2. 手动安装依赖（这一步不能省）**
+**2. Install the dependencies by hand (this step cannot be skipped)**
 
-CC Switch **不解析 `plugin.json` 里的 `dependencies`**。装完本 skill 后，你需要逐个把下面三个仓库也添加进 CC Switch 并安装。每个仓库的 Subdirectory 都是 `skills`：
+CC Switch **does not read the `dependencies` field in `plugin.json`**. After installing this skill you must add and install all three upstream repositories yourself. Each one also uses Subdirectory `skills`:
 
-- [mattpocock/skills](https://github.com/mattpocock/skills) — Subdirectory: `skills`（提供 `grill-with-docs`、`grilling`、`domain-modeling`）
-- [tmdgusya/engineering-discipline](https://github.com/tmdgusya/engineering-discipline) — Subdirectory: `skills`（提供 `milestone-planning`）
-- [obra/superpowers](https://github.com/obra/superpowers) — Subdirectory: `skills`（提供 `writing-plans`）
+- [mattpocock/skills](https://github.com/mattpocock/skills) — Subdirectory: `skills` (provides `grill-with-docs`, `grilling`, `domain-modeling`)
+- [tmdgusya/engineering-discipline](https://github.com/tmdgusya/engineering-discipline) — Subdirectory: `skills` (provides `milestone-planning`)
+- [obra/superpowers](https://github.com/obra/superpowers) — Subdirectory: `skills` (provides `writing-plans`)
 
-三个都装齐后再用本 skill。少装任何一个，工作流会在对应阶段停下来报缺依赖（`SKILL.md` 的 Step 0 就是做这个自检的）。
+Use the workflow only once all three are installed. If one is missing, the workflow stops at the phase that needs it and tells you (that is what Step 0 in `SKILL.md` checks for).
 
-> 注意：CC Switch 安装后这些 skill 的命名空间可能不带插件前缀。本仓库 `SKILL.md` 里写的是 Claude Code Plugin 的 `插件名:skill名` 形式；如果你的 CC Switch 暴露的是裸 skill 名，把前缀去掉理解即可，调用的还是同一个 skill。
+> Note: after a CC Switch install these skills may not carry a plugin prefix. `SKILL.md` uses Claude Code Plugin's `plugin:skill` form; if your CC Switch exposes bare skill names, just drop the prefix — it is the same skill.
 
-## 方式二：Claude Code Plugin
+## Path 2: Claude Code Plugin
 
-依赖由 Claude Code 自动拉取，你不需要手动安装依赖的 skill——但**三个 marketplace 必须先配置**，这一步省不掉。
+Dependencies are pulled automatically, but **the three upstream marketplaces must be configured first** — that part cannot be skipped.
 
-**1. 添加依赖所在的三个 marketplace**
+**1. Add the three marketplaces that host the dependencies**
 
 ```bash
 claude plugin marketplace add mattpocock/skills
@@ -78,46 +87,43 @@ claude plugin marketplace add tmdgusya/engineering-discipline
 claude plugin marketplace add obra/superpowers
 ```
 
-它们各自的 marketplace 名是 `mattpocock`、`engineering-discipline`、`superpowers-dev`，本仓库 `marketplace.json` 的 `allowCrossMarketplaceDependenciesOn` 已声明这三个（外加 `claude-plugins-official`，见下方说明）。
+Their marketplace names are `mattpocock`, `engineering-discipline` and `superpowers-dev`. `allowCrossMarketplaceDependenciesOn` in this repo's `marketplace.json` already declares those three (plus `claude-plugins-official`, see below).
 
-**2. 添加本仓库 marketplace 并安装**
+**2. Add this repo's marketplace and install**
 
 ```bash
 claude plugin marketplace add zhy-ty/grill-plan-execute
 claude plugin install grill-plan-execute@grill-plan-execute-marketplace
 ```
 
-Claude Code 会按 `plugin.json` 的 `dependencies` 自动把三个依赖装上并启用。
+Claude Code then installs and enables all three dependencies listed in `plugin.json`.
 
-**3. 使用**
+**3. Use it**
 
 ```
 /grill-plan-execute:grill-plan-execute
 ```
 
-### 关于依赖解析的两个实测结论
+### Two behaviours worth knowing
 
-以下行为在 Claude Code 2.1.278 上实测（依赖落版：`mattpocock-skills` 1.3.1、`engineering-discipline` 1.7.0、`superpowers` 7.0.0）：
+Both observed on Claude Code 2.1.278 (resolved dependency versions: `mattpocock-skills` 1.3.1, `engineering-discipline` 1.7.0, `superpowers` 7.0.0):
 
-1. **漏加某个上游 marketplace 不会让安装失败。** `plugin install` 照样报成功，但插件随后是 `✘ failed to load`，错误信息会直接点名是哪个依赖没装、并给出补救命令，形如：
+1. **A missing upstream marketplace does not fail the install.** `plugin install` still reports success, but the plugin then shows `✘ failed to load` with an error naming the unsatisfied dependency and the command to fix it:
    `Dependency "mattpocock-skills@mattpocock" is not installed — run `claude plugin install mattpocock-skills@mattpocock`, or check that its marketplace is added`
-   所以装完请执行 `claude plugin list` 确认本插件是 `✔ enabled`，别只看安装那行的对勾。
-2. **顺序不敏感。** 先装本插件、后补上游 marketplace 也能自愈：`marketplace add` 的输出里会带 `(+ 1 dependency: mattpocock-skills)`，即补配市场的那一刻就把欠的依赖装上了。
+   So verify with `claude plugin list` that this plugin reads `✔ enabled` — do not trust the checkmark on the install line.
+2. **Order does not matter.** Installing this plugin first and adding the upstream marketplaces later still self-heals: `marketplace add` output shows `(+ 1 dependency: mattpocock-skills)`, meaning it installs the owed dependency the moment the marketplace is configured.
 
-其他排查项：
+Other things to check:
 
-- 版本区间不满足（例如上游发了 `superpowers` 8.0.0，而依赖写的是 `^7.0.0`）→ 放宽或跟进 `plugin.json` 里的 `version`
-- `superpowers` 你是从官方 `claude-plugins-official` 装的（版本通常落后于上游）→ 把 `plugin.json` 里那条依赖的 `"marketplace": "superpowers-dev"` 改成 `"claude-plugins-official"`；两个名字都已在 allow 清单里，改哪边都能通过权限检查。二者也可共存，实测 `superpowers@superpowers-dev` 与 `superpowers@claude-plugins-official` 同时存在不冲突。
+- Version range unsatisfiable (e.g. upstream ships `superpowers` 8.0.0 while this repo declares `^7.0.0`) → widen or bump `version` in `plugin.json`
+- You installed `superpowers` from the official `claude-plugins-official` marketplace (its version usually trails upstream) → change that dependency's `"marketplace": "superpowers-dev"` to `"claude-plugins-official"` in `plugin.json`; both names are already in the allow list, so either passes the permission check. They can also coexist — `superpowers@superpowers-dev` and `superpowers@claude-plugins-official` side by side was tested and does not conflict.
 
+## Versioning and updates
 
----
-
-## 关于版本与更新
-
-- **依赖内容更新**：本仓库不持有依赖副本，上游发布新版后，你执行 `claude plugin update <插件名>@<marketplace>`（CC Switch 用户重新同步仓库）就能拿到最新正文，**本仓库无需改动**。
-- **本仓库版本号**：只有当依赖发生**破坏性变化**（skill 改名、被删除、产出结构变化导致编排逻辑不再成立）时，才需要改 `SKILL.md` 并把 `plugin.json` 的 `version` 跟进，同时收紧 `dependencies[].version` 区间。
-- 当前 `dependencies` 用的是 caret 区间（`^`）：跟随同一 major 内的新增功能与修复，major 升级不会自动跟进。
+- **Dependency content updates**: this repo holds no copies of the dependencies, so once upstream releases a new version you get it by running `claude plugin update <plugin>@<marketplace>` (CC Switch users re-sync the repository). **Nothing needs to change in this repo.**
+- **This repo's version number**: bump `plugin.json`'s `version` and tighten `dependencies[].version` only when a dependency changes incompatibly — a skill renamed or removed, or its output restructured so the chaining no longer holds.
+- The current `dependencies` use caret (`^`) ranges: they follow features and fixes within the same major version, and deliberately do not follow a major upgrade.
 
 ## License
 
-MIT，见 [LICENSE](./LICENSE)。依赖 skill 的版权归各自作者，本仓库不对它们主张任何权利。
+MIT — see [LICENSE](./LICENSE). Copyright for the dependency skills belongs to their respective authors; this repo claims no rights over them.

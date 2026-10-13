@@ -1,6 +1,6 @@
 ---
 name: grill-plan-execute
-description: 从模糊想法到分里程碑执行计划的端到端编排工作流。先用深度访谈加领域建模收敛需求，再生成经过对抗性评审的里程碑，最后为每个里程碑产出详细执行计划。本 skill 只做编排，不重复依赖 skill 的规则内容。
+description: 从模糊想法到可执行计划的端到端编排工作流。先深度访谈并沉淀领域文档，再询问用户业务复杂度：复杂则走含对抗性评审的里程碑规划、逐里程碑产出实现计划，不复杂则直接产出一份整体计划。本 skill 只做编排，不重复依赖 skill 的规则内容。
 when_to_use: 用户有一个尚未澄清的产品需求或多日技术任务，希望系统地走完"澄清 → 里程碑规划 → 实现计划"的完整链路；用户说"帮我从零规划这个功能"或"先想清楚再拆里程碑再排计划"。
 disable-model-invocation: true
 ---
@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 ## Overview
 
-一个编排层 skill。它把三个外部仓库的 5 个 skill 串成一条固定顺序的工作流，本身不定义任何访谈、里程碑或计划规则——那些规则只存在于被依赖的 skill 里。
+一个编排层 skill。它把三个外部仓库的 5 个 skill 串成一条工作流：访谈收敛后先问用户任务复杂不复杂，复杂就多走一段里程碑规划与对抗性评审，然后产出实现计划并移交执行。本 skill 不定义任何访谈、里程碑或计划规则——那些规则只存在于被依赖的 skill 里。
 
 **本 skill 不含任何依赖 skill 的内容副本。** 依赖的实际文本由用户从原始仓库获取，因此上游更新会直接生效。
 
@@ -25,7 +25,7 @@ disable-model-invocation: true
 | `engineering-discipline:milestone-planning` | 并行探索代码 → 起草里程碑 DAG → 对抗性评审循环 | `engineering-discipline@engineering-discipline` (^1.7.0) | [tmdgusya/engineering-discipline](https://github.com/tmdgusya/engineering-discipline) |
 | `superpowers:writing-plans` | 面向零上下文工程师的详细实现计划 | `superpowers@superpowers-dev` (^7.0.0) | [obra/superpowers](https://github.com/obra/superpowers) |
 
-Phase 4 用到的 `subagent-driven-development`、`executing-plans`、`finishing-a-development-branch` 来自同一个 `superpowers` 插件，不额外增加依赖。
+Phase 5 用到的 `subagent-driven-development`、`executing-plans`、`finishing-a-development-branch` 来自同一个 `superpowers` 插件，不额外增加依赖。
 
 依赖解析因分发方式而异：
 
@@ -48,25 +48,40 @@ Phase 4 用到的 `subagent-driven-development`、`executing-plans`、`finishing
 
 **完成判据：** 依赖 skill 自己判定访谈收敛（设计树没有遗留的隐性假设），且用户确认达成共识。产出：词汇表与决策记录文件。
 
-### Phase 2: 里程碑规划
+### Phase 2: 复杂度评估
+
+向用户提问：
+
+> "根据当前理解，这个任务的业务逻辑是否复杂？判断标准：预计实现步骤超过 8 个，或需要修改/理解超过 3 个核心模块，就算复杂。复杂的话我会先做深入的代码探索和对抗性评审来查缺补漏，再拆里程碑；不复杂就直接出一份实现计划。"
+
+- 用户回答 **不复杂** → 跳到 Phase 4
+- 用户回答 **复杂** → 进入 Phase 3
+
+这个判断权在用户，不要替他决定。可以用 `engineering-discipline:clarification` 之类的提问方式辅助，但最终以用户答复为准。
+
+### Phase 3: 里程碑规划（仅复杂路径）
 
 调用 `engineering-discipline:milestone-planning`，**完整执行它的流程**，不裁剪：并行探索 → 起草 DAG → 独立批评者对抗性评审 → 修订直到无阻塞项。
 
 把 Phase 1 的共识理解、词汇表和决策记录作为输入交给它。
 
+对抗性评审的价值在于：当你自己把握不住需求时，让独立批评者基于代码事实攻击这份划分。所以这一步不能压缩成"顺手拆几个里程碑"。
+
 **完成判据：** 里程碑 DAG 通过评审且用户确认锁定。产出：里程碑划分 + 探索阶段得到的代码事实。
 
-### Phase 3: 逐里程碑生成执行计划
+### Phase 4: 生成执行计划
 
-对 Phase 2 锁定的每个里程碑，调用 `superpowers:writing-plans` 一次。
+**复杂路径**：对 Phase 3 锁定的每个里程碑，调用 `superpowers:writing-plans` 一次。
 
 顺序：按里程碑依赖顺序，从第一个开始，做完一个再下一个，不要把多个里程碑合成一份计划。
 
-每次调用的输入：
+**不复杂路径**：跳过 Phase 3，直接对整体任务调用一次 `superpowers:writing-plans`，输入用 Phase 1 的共识理解与文档。
 
-- 该里程碑的范围与验收目标
+两条路径每次调用的输入：
+
+- 范围与验收目标（整个任务，或该里程碑）
 - Phase 1 产出的术语表与决策记录（`GLOSSARY.md`、ADR）
-- Phase 2 产出的代码事实与评审结论（`Problem Brief`、`Exploration Digest`、`Critique Resolution Log`）
+- Phase 3 产出的代码事实与评审结论（`Problem Brief`、`Exploration Digest`、`Critique Resolution Log`）——仅复杂路径有这部分
 
 要求每份计划在文档头部固定三段，便于后续会话零上下文接手：
 
@@ -74,11 +89,11 @@ Phase 4 用到的 `subagent-driven-development`、`executing-plans`、`finishing
 - **Key Decisions** — 已经定下的设计决策，含出处
 - **Code Facts** — 探索得到的关键事实，含文件路径
 
-一个里程碑一份计划意味着它们会落在同一目录下：给每份计划带上里程碑编号以免互相覆盖（具体保存路径由 `writing-plans` 决定）。
+复杂路径下一个里程碑一份计划，它们会落在同一目录：给每份计划带上里程碑编号以免互相覆盖（具体保存路径由 `writing-plans` 决定）。
 
-**产出：** 每个里程碑一份详细实现计划。
+**产出：** 不复杂路径一份实现计划；复杂路径每个里程碑各一份。
 
-### Phase 4: 移交执行
+### Phase 5: 移交执行
 
 把选择权交给用户，不要自行开始实现。
 
@@ -91,7 +106,7 @@ Phase 4 用到的 `subagent-driven-development`、`executing-plans`、`finishing
 
 两条路做完都进入 `superpowers:finishing-a-development-branch`，由它给 merge / PR / cleanup 选项。
 
-**里程碑之间不要串用执行方式**：先完成当前里程碑的执行与收尾，再回到 Phase 3 要下一份计划。
+**里程碑之间不要串用执行方式**：先完成当前里程碑的执行与收尾，再回到 Phase 4 要下一份计划。
 
 ## Sibling skills
 
@@ -108,15 +123,20 @@ Phase 4 用到的 `subagent-driven-development`、`executing-plans`、`finishing
 ```
 Phase 1: mattpocock-skills:grill-with-docs  (grilling + domain-modeling)
     ↓  需求收敛、用户确认
-Phase 2: engineering-discipline:milestone-planning  (完整流程，含对抗性评审)
-    ↓  里程碑 DAG 锁定
-Phase 3: superpowers:writing-plans  × 每个里程碑
+Phase 2: 询问用户业务是否复杂（>8 步骤 或 >3 核心模块）
+    ├─ 不复杂 ────────────────────────────┐
+    └─ 复杂 → Phase 3                     │
+Phase 3: engineering-discipline:milestone-planning
+         （完整流程：探索 → 起草 → 对抗性评审 → 修订到 dry）
+         ↓  里程碑 DAG 锁定               │
+Phase 4: superpowers:writing-plans        ←┘
+         复杂路径：每里程碑一份；不复杂：整体一份
     ↓
-Phase 4: 移交执行（每个里程碑走完再取下一个）
+Phase 5: 移交执行（复杂路径下每个里程碑走完再取下一个）
     ├─ Subagent-driven → superpowers:subagent-driven-development
     └─ Native          → superpowers:executing-plans
          ↓
     superpowers:finishing-a-development-branch（merge / PR / cleanup）
 ```
 
-阶段严格串行：上游阶段未达完成判据就进入下一阶段，会让里程碑建立在未被确认的需求上。
+阶段严格串行：上游阶段未达完成判据就进入下一阶段，会让里程碑建立在未被确认的需求上。唯一例外是 Phase 2 的分支，它决定 Phase 3 是否执行。
