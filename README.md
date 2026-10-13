@@ -1,6 +1,8 @@
 # grill-plan-execute
 
-An **orchestration-only** Claude Code skill that chains 5 skills from 3 external repositories into one workflow: clarify the requirement by grilling the user and modelling the domain, check with the user how complex the business really is, then produce implementation plans and hand off to execution.
+[中文](./README.zh.md)
+
+An **orchestration-only** Claude Code skill that chains skills from 3 external repositories into one workflow: clarify the requirement by grilling the user and modelling the domain, check with the user how complex the business really is, then produce implementation plans and hand off to execution.
 
 This repository contains chaining logic only. **It holds no copy of any dependency skill's content** — every dependency is fetched from its original repository, so upstream improvements reach users without this repo changing at all.
 
