@@ -25,6 +25,8 @@ disable-model-invocation: true
 | `engineering-discipline:milestone-planning` | 并行探索代码 → 起草里程碑 DAG → 对抗性评审循环 | `engineering-discipline@engineering-discipline` (^1.7.0) | [tmdgusya/engineering-discipline](https://github.com/tmdgusya/engineering-discipline) |
 | `superpowers:writing-plans` | 面向零上下文工程师的详细实现计划 | `superpowers@superpowers-dev` (^7.0.0) | [obra/superpowers](https://github.com/obra/superpowers) |
 
+Phase 4 用到的 `subagent-driven-development`、`executing-plans`、`finishing-a-development-branch` 来自同一个 `superpowers` 插件，不额外增加依赖。
+
 依赖解析因分发方式而异：
 
 - **Claude Code Plugin**：`plugin.json` 已声明这三条依赖，安装本插件时由 Claude Code 自动从各自 marketplace 拉取，用户无需手动装。前提是那三个 marketplace 已在用户机器上配置（见 README 第二节）。
@@ -42,6 +44,8 @@ disable-model-invocation: true
 
 只有在用户明确只要访谈、不要写文档时，才单独调 `mattpocock-skills:grilling`。
 
+若 `grill-with-docs` 无法由 agent 调起（它自己标了 `disable-model-invocation: true`，部分宿主环境会拒绝模型自动触发），直接改调 `mattpocock-skills:grilling` 加 `mattpocock-skills:domain-modeling`——这就是它的全部行为，效果等价。
+
 **完成判据：** 依赖 skill 自己判定访谈收敛（设计树没有遗留的隐性假设），且用户确认达成共识。产出：词汇表与决策记录文件。
 
 ### Phase 2: 里程碑规划
@@ -58,15 +62,46 @@ disable-model-invocation: true
 
 顺序：按里程碑依赖顺序，从第一个开始，做完一个再下一个，不要把多个里程碑合成一份计划。
 
-每次调用都带上：该里程碑的范围与验收目标、Phase 1 的术语与决策、Phase 2 给出的代码事实。
+每次调用的输入：
 
-**产出：** 每个里程碑一份详细实现计划（保存路径由 `writing-plans` 自己决定）。
+- 该里程碑的范围与验收目标
+- Phase 1 产出的术语表与决策记录（`GLOSSARY.md`、ADR）
+- Phase 2 产出的代码事实与评审结论（`Problem Brief`、`Exploration Digest`、`Critique Resolution Log`）
+
+要求每份计划在文档头部固定三段，便于后续会话零上下文接手：
+
+- **Domain Context** — 本里程碑涉及的核心术语
+- **Key Decisions** — 已经定下的设计决策，含出处
+- **Code Facts** — 探索得到的关键事实，含文件路径
+
+一个里程碑一份计划意味着它们会落在同一目录下：给每份计划带上里程碑编号以免互相覆盖（具体保存路径由 `writing-plans` 决定）。
+
+**产出：** 每个里程碑一份详细实现计划。
 
 ### Phase 4: 移交执行
 
 把选择权交给用户，不要自行开始实现。
 
-`writing-plans` 会给出执行方式选项。若用户已装 `superpowers`，它同时提供 `subagent-driven-development` 与 `executing-plans` 两条执行路径，可以引导过去；未安装则把计划文件路径交给用户即可。
+`writing-plans` 自己会问用户选哪种执行方式，它当前给的是两个选项，对应：
+
+| 用户选择 | 转交 | 特点 |
+| --- | --- | --- |
+| **Subagent-driven** | `superpowers:subagent-driven-development` | 每个任务派新 subagent 实现、新 reviewer 检查，最后整分支评审；最彻底，每任务与每轮评审各吃一份新上下文 |
+| **Native** | `superpowers:executing-plans` | 本会话由当前 agent 实现，结束时派一个独立 reviewer 看整分支；最省最快，代价是前期没有独立评审 |
+
+两条路做完都进入 `superpowers:finishing-a-development-branch`，由它给 merge / PR / cleanup 选项。
+
+**里程碑之间不要串用执行方式**：先完成当前里程碑的执行与收尾，再回到 Phase 3 要下一份计划。
+
+## Sibling skills
+
+上游 skill 的正文会提到自己仓库里的兄弟 skill。它们现在都随依赖插件真实存在，按命名空间直接调用即可，不要当成缺失项，也不要凭记忆复述它们的行为：
+
+| 被提到时 | 实际位置 |
+| --- | --- |
+| `clarification`、`plan-crafting`、`long-run`、`run-plan`、`review-work` | `engineering-discipline:<同名>` |
+| `test-driven-development`、`using-git-worktrees`、`requesting-code-review`、`receiving-code-review`、`verification-before-completion`、`dispatching-parallel-agents`、`brainstorming` | `superpowers:<同名>` |
+
 
 ## Order Matters
 
@@ -77,7 +112,11 @@ Phase 2: engineering-discipline:milestone-planning  (完整流程，含对抗性
     ↓  里程碑 DAG 锁定
 Phase 3: superpowers:writing-plans  × 每个里程碑
     ↓
-Phase 4: 移交执行
+Phase 4: 移交执行（每个里程碑走完再取下一个）
+    ├─ Subagent-driven → superpowers:subagent-driven-development
+    └─ Native          → superpowers:executing-plans
+         ↓
+    superpowers:finishing-a-development-branch（merge / PR / cleanup）
 ```
 
 阶段严格串行：上游阶段未达完成判据就进入下一阶段，会让里程碑建立在未被确认的需求上。

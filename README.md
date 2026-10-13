@@ -25,8 +25,13 @@ Phase 2: engineering-discipline:milestone-planning   （完整流程，含对抗
     ↓  里程碑 DAG 锁定
 Phase 3: superpowers:writing-plans   ×  每个里程碑各一份
     ↓
-Phase 4: 把执行方式的选择权交回用户
+Phase 4: 移交执行
+    ├─ Subagent-driven → superpowers:subagent-driven-development
+    └─ Native          → superpowers:executing-plans  →  finishing-a-development-branch
 ```
+
+Phase 4 的三个 skill 同样来自 `superpowers`，不额外增加依赖。
+
 
 ---
 
