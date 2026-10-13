@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "grill-plan-execute",
+  "description": "整合 grilling、domain-modeling、milestone-planning、writing-plans 的编排工作流：澄清需求 → 里程碑规划 → 逐里程碑实现计划",
+  "version": "2.0.0",
+  "author": {
+    "name": "zhy-ty"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/zhy-ty/grill-plan-execute",
+  "dependencies": [
+    {
+      "name": "mattpocock-skills",
+      "marketplace": "mattpocock",
+      "version": "^1.3.1"
+    },
+    {
+      "name": "engineering-discipline",
+      "marketplace": "engineering-discipline",
+      "version": "^1.7.0"
+    },
+    {
+      "name": "superpowers",
+      "marketplace": "superpowers-dev",
+      "version": "^7.0.0"
+    }
+  ]
+}

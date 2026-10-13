@@ -1,0 +1,20 @@
+{
+  "name": "grill-plan-execute-marketplace",
+  "description": "Marketplace for grill-plan-execute, an orchestration skill that chains grilling + domain-modeling into milestone-planning into writing-plans",
+  "owner": {
+    "name": "zhy-ty"
+  },
+  "allowCrossMarketplaceDependenciesOn": [
+    "mattpocock",
+    "engineering-discipline",
+    "superpowers-dev",
+    "claude-plugins-official"
+  ],
+  "plugins": [
+    {
+      "name": "grill-plan-execute",
+      "source": "./",
+      "description": "整合 grilling、domain-modeling、milestone-planning、writing-plans 的编排工作流"
+    }
+  ]
+}
