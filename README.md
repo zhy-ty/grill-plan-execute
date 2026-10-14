@@ -10,6 +10,34 @@ This repository contains chaining logic only. **It holds no copy of any dependen
 
 > **About `obra/superpowers-skills`**: that repository is archived (no updates since 2025-10). The `writing-plans` skill this workflow needs now lives in the actively maintained [obra/superpowers](https://github.com/obra/superpowers) (v7.x). If you need the archived version, fork it and maintain it yourself.
 
+## What this skill does not promise
+
+**It does not guarantee token savings.** No number here is measured against a baseline, chained subagents still consume tokens, and a cheaper execution model can cost more by retrying. What it is for is narrower: **fewer omissions and fewer mistakes in the code that gets written, so there is less rework.** The requirement is confirmed before it is planned, the plan is reviewed before execution is authorised, and the domain language and decisions live in documents rather than in one long chat transcript that the next session cannot see.
+
+`zhy-ty` already works complex requirements through exactly these steps by hand — grill the requirement, model the domain, judge how complex it really is, split it into milestones, write the plan, hand execution to a fresh session. This skill exists only to make that habit one command.
+
+### What zhy-ty actually observed
+
+The origin is a capability problem, not a cost problem. When a requirement was run end to end by an ordinary model, the model's limited intelligence meant the drift only became visible at the very end — the code no longer matched the original requirement, and nothing along the way had flagged it. **That is why he went looking for skills in the first place**, and the workflow in this repository is what he gradually settled on while using them.
+
+The result of that process, from his own usage: **token consumption clearly went up, and rework dropped a lot** — the "agent only reveals at the end that it went off track" situation basically stopped happening. No number here is measured against a baseline, so treat it as one user's experience, not a benchmark.
+
+The separate recommendation to plan on a strong model and execute on a cheaper one is a step beyond that, not the reason this workflow exists. It is an **ideal case**: put the design work on a capable model to push the error rate down further, then let a cheaper model execute a plan that has already survived review. It has not been validated by measurement here, and if the plain workflow above already holds your rework in check, you do not need to buy a second model arrangement.
+
+So: **go read the source skills themselves, and call them directly if that is enough.** Each is strong on its own, and the full chain is not always the right size for the job.
+
+### Using a subset instead
+
+| Your situation | Call | What you get |
+| --- | --- | --- |
+| Simple requirement you can hold in your head end to end | `grill-with-docs` (which wraps `grilling` + `domain-modeling`) | The requirement interrogated and the glossary / decision records written down. No planning stage. |
+| Worried the agent drifts mid-execution | `grill-with-docs` + `writing-plans` | A detailed implementation plan written for an engineer with zero context — that document is the track the agent has to stay on. |
+| You assess the change as large and don't trust yourself to hold it | `grill-with-docs` + `milestone-planning` + `writing-plans` | Exploration and a milestone DAG with adversarial review first, then one plan per milestone. |
+
+The last row **is** this skill's flow — the integrated version adds the Phase 2 complexity question that picks between row 2 and row 3, plus the checkpointed handoff between the phases. If you already know which row applies, calling those skills directly is a legitimate choice.
+
+**And this chain will keep growing.** `SKILL.md` is a pure orchestration layer, and any external skill that proves useful gets inserted into it — that is the intended way for this project to grow (see *Extending the workflow with another skill* further down). All the more reason to know the individual skills and run only the stages your task actually needs, because the honest token picture is this: the integrated chain buys **fewer rewrites, not a lower bill**. What genuinely lowers the bill is picking two call sites where the full chain would use four.
+
 ## Dependencies
 
 | Namespace | Required | Role | Plugin / marketplace | Source repo |
